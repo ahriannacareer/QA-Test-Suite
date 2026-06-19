@@ -1,4 +1,4 @@
-# TC-001: Verify product listings sort by Price: Low to High
+# TC-001: Verify Product Sorting (Price: Low to High)
 
 ## Test Case ID
 TC-001
@@ -20,10 +20,10 @@ Sort product listings by price
 3. Select **Price: Low to High**
 4. Observe the displayed product prices
 
-## Expected Result
+## **Expected Result**
 - The Product Listing Page updates after the sort option is selected
 - Products are displayed in ascending order by price, from lowest to highest
-- No products appear out of order
+- Products are sorted correctly with no inconsistencies across the listing pages
 
 ## Priority
 High
