@@ -1,64 +1,51 @@
 import { test, expect } from '@playwright/test';
-import { HomePage } from '../../pages/HomePage';
-import { SORT_OPTIONS, SORT_RULES } from '../../constants/plpactions';
-import { pageURLS } from '../../constants/urls';
-import { sortValues } from '../../utils/sortHelpers'; 
 
-test('Sort by CO2 Rating', async ({ browser  }) => {
-    const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'
+test('successful payment creates a booking', async ({ request }) => {
+
+  // Step 1: Create payment 
+  const paymentResponse = await request.post(  '/api/payments',  {
+      data: {
+        customerId: 'CUST-10025',
+        facilityId: 'COURT-3',
+        amount: 50.00,
+        paymentMethod: 'credit_card'
+      }
     });
-    const page = await context.newPage();
 
-    const homePage = new HomePage(page);
+  expect(paymentResponse.ok()).toBeTruthy();
 
-    await homePage.goto(pageURLS.homepage.url);
-    
-    
-    const selectedSort = SORT_OPTIONS.CO2_A_E
-    await homePage.sortPLP(selectedSort.value)
+  const contentType = paymentResponse.headers()['content-type'];
+  expect(contentType).toContain('application/json');
 
+  const paymentData = await paymentResponse.json();
+  expect(paymentData.status).toBe('SUCCESS');
+  expect(paymentData.transactionId).toBeDefined();
 
-    await homePage.waitForSortComplete();
+  const transactionId = paymentData.transactionId;
 
-    await expect(homePage.sortDropdown).toHaveValue(selectedSort.value);
-    await expect(homePage.sortDropdown).toContainText(selectedSort.label);
-
-    const allRatings = await homePage.verifyCo2RatingsAcrossPages(SORT_RULES.ascending);
-    
-    for (const { ratings } of allRatings) {
-        const expectedRatings = sortValues(ratings, SORT_RULES.ascending);
-        expect(ratings).toEqual(expectedRatings);
+  // Step 2: Verify booking was generated
+  let bookingData;
+  
+  for (let  attempt = 0; attempt < 10; attempt++) {
+  	const bookingResponse = await request.get(`/api/bookings?transactionsId=${transactionId}`);
+	if (bookingResponse.ok()) { 
+	  const bookingContentType = bookingResponse.headers()['content-type'];
+ 	
+	  expect(bookingContentType).toContain('application/json');
+	  bookingData = await bookingResponse.json()
+	  
+	  // Ensure the booking record contains meaningful information
+	  if ( 
+	       bookingData &&  bookingData.transactionId &&	
+	       bookingData.customerId && bookingData.facilityId  
+	  ) { 
+	       Break;
+	  }
+}
+await new Promise((resolve) => setTimeOut(resolve, 1000));
     }
-
-});
-
-test('Sort by Price', async ({ browser  }) => {
-   
-    const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36'
-    });
-    const page = await context.newPage();
-
-    const homePage = new HomePage(page);
-
-    await homePage.goto(pageURLS.homepage.url);
-    
-    
-    const selectedSort = SORT_OPTIONS.PRICE_LOW_HIGH 
-    await homePage.sortPLP(selectedSort.value) 
-
-    await homePage.waitForSortComplete();
-
-    await expect(homePage.sortDropdown).toHaveValue(selectedSort.value);
-    await expect(homePage.sortDropdown).toContainText(selectedSort.label);
-
-    
-    const allPrices = await homePage.verifySortByPrice(SORT_RULES.ascending);
-    
-    for (const { prices } of allPrices) {
-        const expectedPrices = sortValues(prices, SORT_RULES.ascending, 'number');
-        expect(prices).toEqual(expectedPrices);
-    }
-
+    expect(bookingData).toBeDefined();
+    expect(bookingData.customerId).toBe('CUST-10025');
+    expect(bookingData.facilityId).toBe('COURT-3');
+    expect(bookingData.status).toBe('CONFIRMED');
 });
